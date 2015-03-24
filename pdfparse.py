@@ -145,7 +145,10 @@ class TextGroup(object):
     @property
     def string(self):
         '''Return a single string containing all the strings in this group.'''
-        return '\n'.join([t.string for t in self.texts])
+        if len(self.texts) < 1:
+            return ''
+        else:
+            return '\n'.join([t.string for t in self.texts])
 
 
 def crop_texts(texts, box):
@@ -397,8 +400,9 @@ def parse_file(path, first_page, last_page, crop = None):
                 int(text_element['width']),
                 int(text_element['height'])
             )
+            string = ''.join(text_element.strings)
             text = Text(
-                text_element.string, box, page_num, font=text_element['font']
+                string, box, page_num, font=text_element['font']
             )
             page_texts.append(text)
 
