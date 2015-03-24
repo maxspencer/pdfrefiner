@@ -64,7 +64,7 @@ def bounding_box(boxes):
         bottom = max(bottom, box.bottom)
 
     return Box(left, top, right=right, bottom=bottom)
-
+        
 
 class Text(object):
     def __init__(self, string, box, page, font = None):
@@ -219,65 +219,73 @@ def round_to_column(x, cols):
         else:
             break;
     return i
-        
-
-def column_rounder(cols):
-    return functools.partial(round_to_column, cols=cols)
 
 
-def group_lines(texts, cols, max_line_sep = 5):
+class ColumnMap(object):
+    def __init__(self, existing = None):
+        if existing:
+            try:
+                self.dict = dict(existing.dict)
+            except AttributeError:
+                self.dict = dict(existing)
+
+    def insert(self, page, columns):
+        self.dict[page] = columns
+
+    def get_column(self, page, x):
+        return round_to_column(x, self.dict[page])
+
+
+def group_lines(texts, column_map, max_line_sep = 5):
     if len(texts) == 0:
         return []
 
-    cr = column_rounder(cols)
+    col = column_map.get_column
 
     # Sort the texts by column (rounded) from left to right, and then from top
     # to bottom
-    texts = sorted(texts, key=lambda t: (cr(t.left), t.top))
+    texts = sorted(texts, key=lambda t: (t.page, col(t.page, t.left), t.top))
     groups = []
 
-    current_group = [texts[0]]
-    current_col = cr(texts[0].left)
+    current = [texts[0]]
     for t in texts[1:]:
-        if (cr(t.left) == current_col
-            and t.top < current_group[-1].bottom + max_line_sep):
-            current_group.append(t)
+        if (t.page == current[-1].page
+            and col(t.page, t.left) == col(current[-1].page, current[-1].left)
+            and t.top < current[-1].bottom + max_line_sep):
+            current.append(t)
         else:
-            groups.append(TextGroup(current_group))
-            current_group = [t]
-            current_col = cr(t.left)
+            groups.append(TextGroup(current))
+            current = [t]
 
-    groups.append(TextGroup(current_group))
+    groups.append(TextGroup(current))
 
     return groups
 
 
-def join_over_columns(groups, cols):
+def join_over_columns(groups, column_map):
     if len(groups) < 1:
         return []
 
-    col = column_rounder(cols)
+    col = column_map.get_column
 
     joined = []
     current = groups[0]
 
     for g in groups[1:]:
-        print('current.last=' + str(current.last) + ', g.first=' + str(g.first))
+        cl = current.last
+        gf = g.first
         is_diff_col = (
-            current.last.page != g.first.page or
-            col(current.last.left) != col(g.first.left)
+            cl.page != gf.page or
+            col(cl.page, cl.left) != col(gf.page, gf.left)
         )
-        print('is_diff_col=' + str(is_diff_col))
-        if is_diff_col and not re.match(r'^.*[:\.]\s*$', current.last.string):
+        if is_diff_col and not re.match(r'^.*[:\.]\s*$', cl.string):
             # next group (g) is in a different column and current doesn't end
             # with a full stop or colon then join g to current...
             current = current.join(g)
-            print('joined')
         else:
             # Otherwise current is finished, g is the new current
             joined.append(current)
             current = g
-            print('not joined')
 
     # Append the final group
     joined.append(current)

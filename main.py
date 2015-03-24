@@ -92,10 +92,10 @@ def md_page(path, page_num):
     page_box = pdfparse.Box(0, 217, right=892, bottom=1121)
     texts = pdfparse.crop_texts(texts, page_box)
 
-    cols = pdfparse.columns(texts)
+    column_map = pdfparse.ColumnMap({page_num: pdfparse.columns(texts)})
 
-    groups = pdfparse.group_lines(texts, cols)
-    groups = pdfparse.join_over_columns(groups, cols)
+    groups = pdfparse.group_lines(texts, column_map)
+    groups = pdfparse.join_over_columns(groups, column_map)
     paragraphs = [pdfparse.Paragraph.from_text_group(g) for g in groups]
     for p in paragraphs:
         print(p)
