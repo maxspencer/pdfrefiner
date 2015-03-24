@@ -1,6 +1,11 @@
 import collections
 import functools
 import re
+import subprocess
+import sys
+import tempfile
+
+from bs4 import BeautifulSoup
 
 
 class Box(object):
@@ -228,6 +233,8 @@ class ColumnMap(object):
                 self.dict = dict(existing.dict)
             except AttributeError:
                 self.dict = dict(existing)
+        else:
+            self.dict = dict()
 
     def insert(self, page, columns):
         self.dict[page] = columns
@@ -314,6 +321,65 @@ class Paragraph(object):
             s += ' ' + t.string.strip()
 
         return Paragraph(s, text_group.first, text_group.font)
-            
 
 
+replacements = [
+    ('\t', ' '),
+    (r'[ ]{2,}', ' '),
+    ('•', '*'),
+]
+
+
+def parse_file(path, first_page, last_page, crop = None):
+    with tempfile.NamedTemporaryFile(mode='w+', suffix='.xml') as xml_file:
+        subprocess.check_call(
+            [
+                'pdftohtml', '-xml',
+                '-f', str(int(first_page)), '-l', str(int(last_page)),
+                path, xml_file.name
+            ]
+        )
+        xml = xml_file.read()
+
+    for r in replacements:
+        xml = re.sub(r[0], r[1], xml)
+    
+    soup = BeautifulSoup(xml)
+    page_elements = soup.find_all('page')
+
+    texts = list()
+    col_map = ColumnMap()
+
+    for page_element in page_elements:
+        page_num = int(page_element['number'])
+        page_texts = list()
+
+        for text_element in page_element.find_all('text'):
+            box = Box(
+                int(text_element['left']),
+                int(text_element['top']),
+                int(text_element['width']),
+                int(text_element['height'])
+            )
+            text = Text(
+                text_element.string, box, page_num, font=text_element['font']
+            )
+            page_texts.append(text)
+
+        col_map.insert(page_num, columns(page_texts))
+        texts += page_texts
+
+    # Crop if necessary
+    if crop:
+        texts = crop_texts(texts, crop)
+
+    groups = join_over_columns(group_lines(texts, col_map), col_map)
+    paragraphs = [Paragraph.from_text_group(g) for g in groups]
+    return paragraphs
+
+
+if __name__ == '__main__':
+    ps = parse_file(sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), Box(0, 200, right=892, bottom=1121))
+    for p in ps:
+        print(p)
+        print()
