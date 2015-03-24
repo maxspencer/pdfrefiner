@@ -142,6 +142,11 @@ class TextGroup(object):
     def join(self, group):
         return TextGroup(self.texts + group.texts, self.font or group.texts)
 
+    @property
+    def string(self):
+        '''Return a single string containing all the strings in this group.'''
+        return '\n'.join([t.string for t in self.texts])
+
 
 def crop_texts(texts, box):
     return [t for t in texts if box.contains(t.box)]
@@ -285,9 +290,12 @@ def join_over_columns(groups, column_map):
             cl.page != gf.page or
             col(cl.page, cl.left) != col(gf.page, gf.left)
         )
-        if is_diff_col and not re.match(r'^.*[:\.]\s*$', cl.string):
-            # next group (g) is in a different column and current doesn't end
-            # with a full stop or colon then join g to current...
+        if (is_diff_col
+            and cl.font == gf.font
+            and not re.match(r'^.*[:\.]\s*$', cl.string)):
+            # next group (g) is in a different column, has the same font and
+            # current doesn't end with a full stop or colon then join g to
+            # current...
             current = current.join(g)
         else:
             # Otherwise current is finished, g is the new current
@@ -301,26 +309,35 @@ def join_over_columns(groups, column_map):
 
 
 class Paragraph(object):
-    def __init__(self, string, first_line, font = None):
+    def __init__(self, string, position):
         self.string = string
-        self.first_line = first_line
-        self.font = font
+        self.position = position
 
     def __str__(self):
-        return '({}, {}): {}'.format(
-            self.first_line.left, self.first_line.top, self.string)
+        return '{}: {}'.format(str(self.position), self.string)
 
-    @classmethod
-    def from_text_group(cls, text_group):
-        if len(text_group) < 1:
-            return ''
 
-        s = text_group.first.string.strip()
+class Heading(object):
+    def __init__(self, string, position, parent):
+        self.string = string
+        self.position = position
+        self.parent = parent
+        
+        # TODO: ensure parent is before self
 
-        for t in text_group.texts[1:]:
-            s += ' ' + t.string.strip()
+    def __str__(self):
+        return '{}: {} {}'.format(
+            str(self.position),
+            '#' * self.level,
+            self.string
+        )
 
-        return Paragraph(s, text_group.first, text_group.font)
+    @property
+    def level(self):
+        if self.parent is not None:
+            return self.parent.level + 1
+        else:
+            return 1
 
 
 replacements = [
@@ -328,6 +345,22 @@ replacements = [
     (r'[ ]{2,}', ' '),
     ('•', '*'),
 ]
+
+
+class _HeadingTracker(object):
+    def __init__(self):
+        self._last_headings = {0: None}
+
+    def get_parent(self, size_rank):
+        ranks = self._last_headings.keys()
+        prec_rank = max([rank for rank in ranks if rank < size_rank])
+        return self._last_headings[prec_rank]
+
+    def new_heading(self, size_rank, heading):
+        self._last_headings[size_rank] = heading
+        for rank in self._last_headings.keys():
+            if rank > size_rank:
+                del self._last_headings[rank]
 
 
 def parse_file(path, first_page, last_page, crop = None):
@@ -340,6 +373,9 @@ def parse_file(path, first_page, last_page, crop = None):
             ]
         )
         xml = xml_file.read()
+
+    with open('xml.xml', 'w') as f:
+        f.write(xml)
 
     for r in replacements:
         xml = re.sub(r[0], r[1], xml)
@@ -369,13 +405,49 @@ def parse_file(path, first_page, last_page, crop = None):
         col_map.insert(page_num, columns(page_texts))
         texts += page_texts
 
+    # Use fonts to make the heading level map
+    fontspec_elements = soup.find_all('fontspec')
+    sizes = dict()
+    for spec in fontspec_elements:
+        try:
+            sizes[spec['size']].append(spec['id'])
+        except KeyError:
+            sizes[spec['size']] = [spec['id']]
+    levels = dict()
+    i = 1
+    for size in sorted(sizes.keys(), reverse=True):
+        for font in sizes[size]:
+            levels[font] = i
+        i += 1
+
     # Crop if necessary
     if crop:
         texts = crop_texts(texts, crop)
 
+    # Group texts 
     groups = join_over_columns(group_lines(texts, col_map), col_map)
-    paragraphs = [Paragraph.from_text_group(g) for g in groups]
-    return paragraphs
+
+    # Turn into model objects
+    result = list()
+    heading_tracker = _HeadingTracker()
+    for group in groups:
+        if '.' in group.string:
+            string = ' '.join([t.string.strip() for t in group.texts])
+            position = (group.first.page, group.first.left, group.first.top)
+            item = Paragraph(string, position)
+        else:
+            string = ' '.join([t.string.strip() for t in group.texts])
+            position = (group.first.page, group.first.left, group.first.top)
+
+            # Sort out heading level and parent
+            size_rank = levels[group.first.font]
+            parent = heading_tracker.get_parent(size_rank)
+            item = Heading(string, position, parent)
+            heading_tracker.new_heading(size_rank, item)
+
+        result.append(item)
+
+    return result
 
 
 if __name__ == '__main__':
@@ -383,3 +455,4 @@ if __name__ == '__main__':
     for p in ps:
         print(p)
         print()
+        pass
