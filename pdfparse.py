@@ -257,9 +257,13 @@ def group_lines(texts, column_map, max_line_sep = 5):
 
     col = column_map.get_column
 
-    # Sort the texts by column (rounded) from left to right, and then from top
-    # to bottom
-    texts = sorted(texts, key=lambda t: (t.page, col(t.page, t.left), t.top))
+    # Sort the texts by page, then by column (rounded) from left to right, then
+    # from top to bottom. Then any ties are broken using the raw (as opposed to
+    # column-rounded) left coord.
+    texts = sorted(
+        texts,
+        key=lambda t: (t.page, col(t.page, t.left), t.top, t.left)
+    )
     groups = []
 
     current = [texts[0]]
@@ -361,9 +365,11 @@ class _HeadingTracker(object):
 
     def new_heading(self, size_rank, heading):
         self._last_headings[size_rank] = heading
-        for rank in self._last_headings.keys():
-            if rank > size_rank:
-                del self._last_headings[rank]
+        ranks_to_clear = [
+            rank for rank in self._last_headings.keys() if rank > size_rank
+        ]
+        for rank in ranks_to_clear:
+            del self._last_headings[rank]
 
 
 def parse_file(path, first_page, last_page, crop = None):
