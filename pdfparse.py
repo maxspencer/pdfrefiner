@@ -51,6 +51,15 @@ class Box(object):
             other.bottom <= self.bottom
         )
 
+    def scale(self, factor):
+        f = float(factor)
+        b = Box(
+            f * self.left, f * self.top,
+            right=(f * self.right), bottom=(f * self.bottom)
+        )
+        print(b)
+        return b
+
 
 def bounding_box(boxes):
     # Check there's at least one box
@@ -347,6 +356,30 @@ class Heading(object):
             return 1
 
 
+class Page(object):
+    def __init__(self, number, width, height, crop = None):
+        self.number = number
+        self.width = width
+        self.height = height
+        self.crop = crop
+
+    def __str__(self):
+        return '<Page: {}, {}x{}>'.format(self.number, self.width, self.height)
+
+
+class Document(object):
+    def __init__(self):
+        self.pages = list()
+        self.contents = list()
+
+    def __str__(self):
+        return '\n\n'.join([str(c) for c in self.contents])
+
+    @property
+    def page_count(self):
+        return len(self.pages)
+
+
 replacements = [
     ('\t', ' '),
     (r'[ ]{2,}', ' '),
@@ -372,11 +405,12 @@ class _HeadingTracker(object):
             del self._last_headings[rank]
 
 
-def parse_file(path, first_page, last_page, crop = None):
+def parse_file(path, first_page, last_page, crop = None, zoom = 1.0):
     with tempfile.NamedTemporaryFile(mode='w+', suffix='.xml') as xml_file:
         subprocess.check_call(
             [
                 'pdftohtml', '-xml',
+                '-zoom', str(zoom),
                 '-f', str(int(first_page)), '-l', str(int(last_page)),
                 path, xml_file.name
             ]
@@ -392,11 +426,33 @@ def parse_file(path, first_page, last_page, crop = None):
     soup = BeautifulSoup(xml)
     page_elements = soup.find_all('page')
 
+    # May later have different crops for different pages in some kind of dict
+    page_crops = collections.defaultdict(lambda: crop)
+
+    # The result:
+    document = Document()
+
+    if not page_elements:
+        # Empty! :(
+        return document
+    
     texts = list()
     col_map = ColumnMap()
 
     for page_element in page_elements:
         page_num = int(page_element['number'])
+        page_crop = page_crops[page_num]
+
+        # Add page to document
+        document.pages.append(
+            Page(
+                page_num,
+                int(page_element['width']),
+                int(page_element['height']),
+                page_crop
+            )
+        )
+
         page_texts = list()
 
         for text_element in page_element.find_all('text'):
@@ -412,6 +468,13 @@ def parse_file(path, first_page, last_page, crop = None):
             )
             page_texts.append(text)
 
+        # Crop this page individually
+        if page_crop:
+            if zoom != 1.0:
+                page_crop = page_crop.scale(zoom)
+            page_texts = crop_texts(page_texts, page_crop)
+
+        # Add to column map and total list of texts
         col_map.insert(page_num, columns(page_texts))
         texts += page_texts
 
@@ -430,15 +493,10 @@ def parse_file(path, first_page, last_page, crop = None):
             levels[font] = i
         i += 1
 
-    # Crop if necessary
-    if crop:
-        texts = crop_texts(texts, crop)
-
     # Group texts 
     groups = join_over_columns(group_lines(texts, col_map), col_map)
 
     # Turn into model objects
-    result = list()
     heading_tracker = _HeadingTracker()
     for group in groups:
         if '.' in group.string:
@@ -455,14 +513,16 @@ def parse_file(path, first_page, last_page, crop = None):
             item = Heading(string, position, parent)
             heading_tracker.new_heading(size_rank, item)
 
-        result.append(item)
+        document.contents.append(item)
 
-    return result
+    return document
 
 
 if __name__ == '__main__':
-    ps = parse_file(sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), Box(0, 200, right=892, bottom=1121))
-    for p in ps:
+    doc = parse_file(
+        sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), 
+        Box(50, 75, right=550, bottom=780), sys.argv[4])
+        #None, sys.argv[4])
+    for p in doc.pages:
         print(p)
-        print()
-        pass
+    print(doc)
