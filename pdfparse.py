@@ -405,16 +405,15 @@ class _HeadingTracker(object):
             del self._last_headings[rank]
 
 
-def parse_file(path, first_page, last_page, crop = None, zoom = 1.0):
+def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.0):
     with tempfile.NamedTemporaryFile(mode='w+', suffix='.xml') as xml_file:
-        subprocess.check_call(
-            [
-                'pdftohtml', '-xml',
-                '-zoom', str(zoom),
-                '-f', str(int(first_page)), '-l', str(int(last_page)),
-                path, xml_file.name
-            ]
-        )
+        args = ['pdftohtml', '-xml', '-zoom', str(zoom)]
+        if first_page:
+            args += ['-f', str(int(first_page))]
+        if last_page:
+            args += ['-l', str(int(last_page))]
+        args += [path, xml_file.name]
+        subprocess.check_call(args)
         xml = xml_file.read()
 
     with open('xml.xml', 'w') as f:
