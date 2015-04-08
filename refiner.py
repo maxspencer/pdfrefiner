@@ -57,7 +57,6 @@ class Box(object):
             f * self.left, f * self.top,
             right=(f * self.right), bottom=(f * self.bottom)
         )
-        print(b)
         return b
 
 
@@ -408,7 +407,7 @@ class _HeadingTracker(object):
             del self._last_headings[rank]
 
 
-def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.0, line_sep=None):
+def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.0, line_sep=None, ignore=[]):
     with tempfile.NamedTemporaryFile(mode='w+', suffix='.xml') as xml_file:
         args = ['pdftohtml', '-xml', '-zoom', str(zoom)]
         if first_page:
@@ -455,30 +454,31 @@ def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.
             )
         )
 
-        page_texts = list()
+        if page_num not in ignore:
+            page_texts = list()
 
-        for text_element in page_element.find_all('text'):
-            box = Box(
-                int(text_element['left']),
-                int(text_element['top']),
-                int(text_element['width']),
-                int(text_element['height'])
-            )
-            string = ''.join(text_element.strings)
-            text = Text(
-                string, box, page_num, font=text_element['font']
-            )
-            page_texts.append(text)
+            for text_element in page_element.find_all('text'):
+                box = Box(
+                    int(text_element['left']),
+                    int(text_element['top']),
+                    int(text_element['width']),
+                    int(text_element['height'])
+                )
+                string = ''.join(text_element.strings)
+                text = Text(
+                    string, box, page_num, font=text_element['font']
+                )
+                page_texts.append(text)
 
-        # Crop this page individually
-        if page_crop:
-            if zoom != 1.0:
-                page_crop = page_crop.scale(zoom)
-            page_texts = crop_texts(page_texts, page_crop)
+            # Crop this page individually
+            if page_crop:
+                if zoom != 1.0:
+                    page_crop = page_crop.scale(zoom)
+                page_texts = crop_texts(page_texts, page_crop)
 
-        # Add to column map and total list of texts
-        col_map.insert(page_num, columns(page_texts))
-        texts += page_texts
+            # Add to column map and total list of texts
+            col_map.insert(page_num, columns(page_texts))
+            texts += page_texts
 
     # Use fonts to make the heading level map
     fontspec_elements = soup.find_all('fontspec')
@@ -528,7 +528,7 @@ def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.
 if __name__ == '__main__':
     doc = parse_file(
         sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), 
-        None, sys.argv[4], float(sys.argv[5]))
+        None, sys.argv[4], float(sys.argv[5]), [int(s) for s in sys.argv[6].split(',')])
         #None, sys.argv[4])
     for p in doc.pages:
         print(p)
