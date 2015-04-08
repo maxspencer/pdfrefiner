@@ -418,9 +418,6 @@ def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.
         subprocess.check_call(args)
         xml = xml_file.read()
 
-    with open('xml.xml', 'w') as f:
-        f.write(xml)
-
     for r in replacements:
         xml = re.sub(r[0], r[1], xml)
     
