@@ -260,7 +260,7 @@ class ColumnMap(object):
         return round_to_column(x, self.dict[page])
 
 
-def group_lines(texts, column_map, max_line_sep = 5):
+def group_lines(texts, column_map, max_line_sep = 1.0):
     if len(texts) == 0:
         return []
 
@@ -277,9 +277,12 @@ def group_lines(texts, column_map, max_line_sep = 5):
 
     current = [texts[0]]
     for t in texts[1:]:
+        sep = current[-1].height * max_line_sep
         if (t.page == current[-1].page
             and col(t.page, t.left) == col(current[-1].page, current[-1].left)
-            and t.top < current[-1].bottom + max_line_sep):
+            and t.top < current[-1].bottom + sep
+            and t.font == current[-1].font
+            and not t.string.startswith('*')): # To stop lists getting grouped
             current.append(t)
         else:
             groups.append(TextGroup(current))
@@ -405,7 +408,7 @@ class _HeadingTracker(object):
             del self._last_headings[rank]
 
 
-def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.0):
+def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.0, line_sep=None):
     with tempfile.NamedTemporaryFile(mode='w+', suffix='.xml') as xml_file:
         args = ['pdftohtml', '-xml', '-zoom', str(zoom)]
         if first_page:
@@ -492,13 +495,17 @@ def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.
             levels[font] = i
         i += 1
 
-    # Group texts 
-    groups = join_over_columns(group_lines(texts, col_map), col_map)
+    # Group texts
+    if line_sep:
+        groups = group_lines(texts, col_map, max_line_sep=line_sep)
+    else:
+        groups = group_lines(texts, col_map)
+    groups = join_over_columns(groups, col_map)
 
     # Turn into model objects
-    heading_tracker = _HeadingTracker()
+    #heading_tracker = _HeadingTracker()
     for group in groups:
-        if '.' in group.string:
+        if '.' in group.string or '*' in group.string: # No sentences of li's
             string = ' '.join([t.string.strip() for t in group.texts])
             position = (group.first.page, group.first.left, group.first.top)
             item = Paragraph(string, position)
@@ -507,10 +514,11 @@ def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.
             position = (group.first.page, group.first.left, group.first.top)
 
             # Sort out heading level and parent
-            size_rank = levels[group.first.font]
-            parent = heading_tracker.get_parent(size_rank)
+            #size_rank = levels[group.first.font]
+            #parent = heading_tracker.get_parent(size_rank)
+            parent = None
             item = Heading(string, position, parent)
-            heading_tracker.new_heading(size_rank, item)
+            #heading_tracker.new_heading(size_rank, item)
 
         document.contents.append(item)
 
@@ -520,7 +528,7 @@ def parse_file(path, first_page = None, last_page = None, crop = None, zoom = 1.
 if __name__ == '__main__':
     doc = parse_file(
         sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), 
-        Box(50, 75, right=550, bottom=780), sys.argv[4])
+        None, sys.argv[4], float(sys.argv[5]))
         #None, sys.argv[4])
     for p in doc.pages:
         print(p)
