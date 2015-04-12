@@ -29,19 +29,27 @@ class BoxTestCase(unittest.TestCase):
         self.assertEqual(box1, box2, 'boxes differ')
 
     def test_default_constructor(self):
-        box = core.Box(12, 34, 56, 78)
+        box = core.Box(12, 34, 56, 78, 9)
         self.assertEqual(box.left, 12, 'incorrect left')
         self.assertEqual(box.top, 34, 'incorrect top')
         self.assertEqual(box.width, 56, 'incorrect width')
         self.assertEqual(box.height, 78, 'incorrect height')
+        self.assertEqual(box.page, 9, 'incorrect page')
 
     def test_eq(self):
-        box = core.Box(10, 10, 10, 10)
-        self.assertNotEqual(box, core.Box(11, 10, 10, 10), 'left not equal')
-        self.assertNotEqual(box, core.Box(10, 11, 10, 10), 'top not equal')
-        self.assertNotEqual(box, core.Box(10, 10, 11, 10), 'width not equal')
-        self.assertNotEqual(box, core.Box(10, 10, 10, 11), 'height not equal')
-        self.assertEqual(box, core.Box(10, 10, 10, 10), 'should be equal')
+        box = core.Box(10, 10, 10, 10, page=1)
+        self.assertNotEqual(box, core.Box(11, 10, 10, 10, 1), 'left neq')
+        self.assertNotEqual(box, core.Box(10, 11, 10, 10, 1), 'top neq')
+        self.assertNotEqual(box, core.Box(10, 10, 11, 10, 1), 'width neq')
+        self.assertNotEqual(box, core.Box(10, 10, 10, 11, 1), 'height neq')
+        self.assertNotEqual(box, core.Box(10, 10, 10, 10, 2), 'page neq')
+        self.assertNotEqual(box, core.Box(10, 10, 10, 10), 'page neq (None)')
+        self.assertEqual(box, core.Box(10, 10, 10, 10, 1), 'should be equal')
+        self.assertEqual(
+            core.Box(1, 2, 3, 4, page=None),
+            core.Box(1, 2, 3, 4, page=None),
+            'should be equal'
+        )
 
     def test_set_width(self):
         box = core.Box(10, 10, 10, 10)
@@ -67,7 +75,7 @@ class BoxTestCase(unittest.TestCase):
         self.assertEqual(box.height, 20, 'incorrect height')
         self.assertEqual(box, core.Box(10, 10, 10, 20), 'set bottom error')
 
-    def test_contains(self):
+    def test_contains_no_page(self):
         cont = core.Box(0, 0, 100, 100)
         self.assertFalse(cont.contains(core.Box(-10, -10, 120, 120)))
         self.assertFalse(cont.contains(core.Box(110, 0, 100, 100)))
@@ -83,6 +91,20 @@ class BoxTestCase(unittest.TestCase):
         self.assertTrue(cont.contains(core.Box(50, 25, 50, 50)))
         self.assertTrue(cont.contains(core.Box(25, 50, 50, 50)))
         self.assertTrue(cont.contains(core.Box(10, 10, 80, 80)))
+
+    def test_contains_with_pages(self):
+        cont = core.Box(0, 0, 100, 100, page=1)
+        self.assertFalse(cont.contains(core.Box(0, 0, 100, 100, page=2)))
+        self.assertFalse(cont.contains(core.Box(0, 0, 100, 100, page=None)))
+        self.assertTrue(cont.contains(cont))
+        self.assertTrue(cont.contains(core.Box(0, 0, 100, 100, page=1)))
+        self.assertTrue(cont.contains(core.Box(10, 10, 80, 80, page=1)))
+        nopage = core.Box(0, 0, 100, 100, page=None)
+        self.assertTrue(nopage.contains(core.Box(0, 0, 100, 100, page=2)))
+        self.assertTrue(nopage.contains(core.Box(0, 0, 100, 100, page=None)))
+        self.assertTrue(nopage.contains(nopage))
+        self.assertTrue(nopage.contains(core.Box(0, 0, 100, 100, page=1)))
+        self.assertTrue(nopage.contains(core.Box(10, 10, 80, 80, page=1)))
 
     def test_scale(self):
         box = core.Box(10, 10, 10, 10)
