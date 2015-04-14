@@ -4,15 +4,12 @@ import tempfile
 import bs4
 import sys
 
-from refiner.input.model import Document, Page, Font, Text
+from refiner.input.model import InputDocument, InputPage, Font, Text
 
 
-def parse(string, replacements = []):
-    for r in replacements:
-        string = re.sub(r[0], r[1], string)
-    
+def parse(string):
     soup = bs4.BeautifulSoup(string)
-    document = Document()
+    document = InputDocument()
 
     fontspec_elements = soup.find_all('fontspec')
     for e in fontspec_elements:
@@ -21,7 +18,7 @@ def parse(string, replacements = []):
 
     page_elements = soup.find_all('page')
     for e in page_elements:
-        page = Page(int(e['number']), int(e['width']), int(e['height']))
+        page = InputPage(int(e['number']), int(e['width']), int(e['height']))
         document.pages.append(page)
 
         for te in e.find_all('text'):

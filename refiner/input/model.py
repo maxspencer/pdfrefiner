@@ -1,12 +1,12 @@
 import itertools
 
-from refiner import core
+from refiner.geometry import Box
 
 
 class Text(object):
     def __init__(self, string, page, left, top, width = 0, height = 0, right = None, bottom = None, font = None):
         self.string = string
-        self.box = core.Box(
+        self.box = Box(
             left, top,
             width=width, height=height,
             page=page,
@@ -75,7 +75,7 @@ class Font(object):
         return '<Font {}>'.format(self.id)
 
 
-class Page(object):
+class InputPage(object):
     def __init__(self, number, width, height):
         '''Create a new Page instance.'''
         self.number = int(number)
@@ -86,7 +86,7 @@ class Page(object):
     def __str__(self):
         return '<Page {}>'.format(self.number)
 
-class Document(object):
+class InputDocument(object):
     def __init__(self):
         '''Create a new Document instance.'''
         self.pages = list()
