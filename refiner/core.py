@@ -67,7 +67,6 @@ def group_lines(texts, column_map, max_line_sep = DEFAULT_MAX_LINE_SEP, min_h_se
                 t.top == prev.top and
                 t.left < prev.right + (min_h_sep * t.height)
         ):
-            print('joined ' + prev.string + '--' + t.string)
             t.col = prev.col
         else:
             t.col = col(t)
@@ -87,8 +86,8 @@ def group_lines(texts, column_map, max_line_sep = DEFAULT_MAX_LINE_SEP, min_h_se
         sep = current[-1].height * max_line_sep
         if (t.page == current[-1].page
             and t.col == current[-1].col
-            and t.top < current[-1].bottom + sep):
-            #and t.font == current[-1].font
+            and t.top < current[-1].bottom + sep
+            and t.font.size == current[-1].font.size):
             #and not t.string.startswith('*')): # To stop lists getting grouped
             current.append(t)
         else:
