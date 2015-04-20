@@ -43,19 +43,42 @@ class TextGroup(object):
 
 
 DEFAULT_MAX_LINE_SEP = 1.0
+DEFAULT_MIN_H_SEP = 0.5
 
-def group_lines(texts, column_map, max_line_sep = DEFAULT_MAX_LINE_SEP):
+def group_lines(texts, column_map, max_line_sep = DEFAULT_MAX_LINE_SEP, min_h_sep = DEFAULT_MIN_H_SEP):
     if len(texts) == 0:
         return []
 
     col = column_map.get_column
+
+    # New preliminary phase: Determine the correct column for each text. Just
+    # using the column map directly can lead to problems when a page contains
+    # some lines which span multiple columms and these lines are broken after
+    # parsing, for example if they contain multiple font styles.
+    prelim = sorted(
+        texts,
+        key=lambda t: (t.page.number, t.top, t.left)
+    )
+    prev = prelim[0]
+    prev.col = col(prev)
+    for t in prelim[1:]:
+        if (
+                t.page == prev.page and
+                t.top == prev.top and
+                t.left < prev.right + (min_h_sep * t.height)
+        ):
+            print('joined ' + prev.string + '--' + t.string)
+            t.col = prev.col
+        else:
+            t.col = col(t)
+        prev = t
 
     # Sort the texts by page, then by column (rounded) from left to right, then
     # from top to bottom. Then any ties are broken using the raw (as opposed to
     # column-rounded) left coord.
     texts = sorted(
         texts,
-        key=lambda t: (t.page.number, col(t), t.top, t.left)
+        key=lambda t: (t.page.number, t.col, t.top, t.left)
     )
     groups = []
 
@@ -63,10 +86,10 @@ def group_lines(texts, column_map, max_line_sep = DEFAULT_MAX_LINE_SEP):
     for t in texts[1:]:
         sep = current[-1].height * max_line_sep
         if (t.page == current[-1].page
-            and col(t) == col(current[-1])
-            and t.top < current[-1].bottom + sep
-            and t.font == current[-1].font
-            and not t.string.startswith('*')): # To stop lists getting grouped
+            and t.col == current[-1].col
+            and t.top < current[-1].bottom + sep):
+            #and t.font == current[-1].font
+            #and not t.string.startswith('*')): # To stop lists getting grouped
             current.append(t)
         else:
             groups.append(TextGroup(current))
@@ -125,6 +148,10 @@ def is_heading(group, prev_group = None, next_group = None):
             # Same font as previous and next groups, so probably not a heading
             return False
 
+    if group.string.count(' ') > 14:
+        # More than 10 words
+        return False
+
     return True
         
 
@@ -141,14 +168,23 @@ def refine(
         roi = None, width = None,
         max_line_sep = DEFAULT_MAX_LINE_SEP,
         smallest_col = DEFAULT_SMALLEST_COL,
-        min_col_votes = DEFAULT_MIN_COL_VOTES
+        min_col_votes = DEFAULT_MIN_COL_VOTES,
+        min_h_sep = DEFAULT_MIN_H_SEP
 ):
     output_document = OutputDocument()
     
     roi_texts = list()
     column_map = ColumnMap()
 
-    for input_page in input.pages[first:last+1]:
+    if first is not None:
+        first = max(first - 1, 0)
+    else:
+        first = 0
+
+    if last is None:
+        last = len(input.pages)
+
+    for input_page in input.pages[first:last]:
         # Is this page ignored?
         ignore_page = input_page.number in ignore
 
@@ -274,8 +310,8 @@ if __name__ == '__main__':
     from refiner.input.pdftohtml import parse
     import sys
     with open(sys.argv[1], 'r') as f:
-        input_doc = parse(f.read())
-    output_doc = refine(input_doc, first=17, last=18, width=int(sys.argv[2]), roi=(0.05, 0.09, 0.95, 0.91), max_line_sep=0.5)
+        input_doc = parse(f.read(), [(r'�', '.')])
+    output_doc = refine(input_doc, width=int(sys.argv[2]), roi=(0.0, 0.08, 0.952, 0.94), max_line_sep=0.2, min_col_votes=2)
     print(str(len(output_doc.pages)) + ' output pages')
     for p in output_doc.page_list:
         print(p)

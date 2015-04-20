@@ -7,7 +7,10 @@ import sys
 from refiner.input.model import InputDocument, InputPage, Font, Text
 
 
-def parse(string):
+def parse(string, replacements=[]):
+    for r in replacements:
+        string = re.sub(r[0], r[1], string)
+
     soup = bs4.BeautifulSoup(string)
     document = InputDocument()
 
