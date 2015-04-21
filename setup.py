@@ -2,12 +2,12 @@ from distutils.core import setup
 setup(
     name = 'pdfrefiner',
     packages = ['refiner', 'refiner.input', 'refiner.output'],
-    version = '0.1',
+    version = '0.1.2',
     description = 'A python module for improving the output of PDF parsing and conversion tools.',
     author = 'Max Spencer',
     author_email = 'mrmaxspencer@gmail.com',
     url = 'https://github.com/maxspencer/pdfrefiner',
-    download_url = 'https://github.com/maxspencer/pdfrefiner/archive/0.1.1.tar.gz',
+    download_url = 'https://github.com/maxspencer/pdfrefiner/archive/0.1.2.tar.gz',
     install_requires = [
         'beautifulsoup4',
     ],
