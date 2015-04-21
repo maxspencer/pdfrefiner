@@ -7,7 +7,7 @@ setup(
     author = 'Max Spencer',
     author_email = 'mrmaxspencer@gmail.com',
     url = 'https://github.com/maxspencer/pdfrefiner',
-    download_url = 'https://github.com/maxspencer/pdfrefiner/archive/0.1.tar.gz',
+    download_url = 'https://github.com/maxspencer/pdfrefiner/archive/0.1.1.tar.gz',
     install_requires = [
         'beautifulsoup4',
     ],
