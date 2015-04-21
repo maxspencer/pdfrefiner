@@ -7,7 +7,7 @@ setup(
     author = 'Max Spencer',
     author_email = 'mrmaxspencer@gmail.com',
     url = 'https://github.com/maxspencer/pdfrefiner',
-    download_url = 'https://github.com/maxspencer/pdfrefiner/tarball/0.1',
+    download_url = 'https://github.com/maxspencer/pdfrefiner/archive/0.1.tar.gz'
     keywords = ['pdf', 'document'],
     classifiers = [
         'Development Status :: 2 - Pre-Alpha',
